@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: suricata
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: suricata-rules
+  namespace: suricata
+data:
+  local.rules: |
+    alert tcp any any -> any any (msg:"LOCAL Possible TCP SYN scan or SYN flood"; flags:S; threshold:type both, track by_src, count 30, seconds 10; classtype:attempted-recon; sid:1000001; rev:1;)
+    alert icmp any any -> any any (msg:"LOCAL Possible ICMP flood"; threshold:type both, track by_src, count 100, seconds 1; classtype:attempted-dos; sid:1000002; rev:1;)
+    alert udp any any -> any any (msg:"LOCAL Possible UDP flood"; threshold:type both, track by_src, count 200, seconds 1; classtype:attempted-dos; sid:1000003; rev:1;)
+    alert tcp any any -> any any (msg:"LOCAL Possible NULL scan"; flags:0; classtype:attempted-recon; sid:1000004; rev:1;)
+    alert tcp any any -> any any (msg:"LOCAL Possible XMAS scan"; flags:FPU; classtype:attempted-recon; sid:1000005; rev:1;)
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: suricata-edge
+  namespace: suricata
+spec:
+  selector:
+    matchLabels:
+      app: suricata-edge
+  template:
+    metadata:
+      labels:
+        app: suricata-edge
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/hostname: edge
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: suricata
+          image: jasonish/suricata:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+                - SYS_NICE
+          command:
+            - /bin/sh
+            - -c
+            - |
+              mkdir -p /var/log/suricata
+              suricata -i ens2f0 -i cni0 -i flannel.1 -k none -l /var/log/suricata -S /etc/suricata/rules/local.rules
+          volumeMounts:
+            - name: rules
+              mountPath: /etc/suricata/rules/local.rules
+              subPath: local.rules
+              readOnly: true
+            - name: logs
+              mountPath: /var/log/suricata
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: rules
+          configMap:
+            name: suricata-rules
+        - name: logs
+          hostPath:
+            path: /var/log/suricata
+            type: DirectoryOrCreate

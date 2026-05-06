@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: suricata-upf-rules
+  namespace: default
+data:
+  local.rules: |
+    alert tcp 60.60.0.0/24 any -> any any (msg:"UPF UE TCP SYN observed"; flags:S; classtype:attempted-recon; sid:1100001; rev:3;)
+    alert icmp 60.60.0.0/24 any -> any any (msg:"UPF UE Possible ICMP flood"; detection_filter:track by_src, count 100, seconds 1; classtype:attempted-dos; sid:1100002; rev:2;)
+    alert udp 60.60.0.0/24 any -> any any (msg:"UPF UE Possible UDP flood"; detection_filter:track by_src, count 200, seconds 1; classtype:attempted-dos; sid:1100003; rev:2;)
+    alert tcp 60.60.0.0/24 any -> any any (msg:"UPF UE Possible NULL scan"; flags:0; classtype:attempted-recon; sid:1100004; rev:1;)
+    alert tcp 60.60.0.0/24 any -> any any (msg:"UPF UE Possible XMAS scan"; flags:FPU; classtype:attempted-recon; sid:1100005; rev:1;)
