@@ -1,0 +1,18 @@
+# Suricata Container
+- name: Intrusion Detection
+  image: intrusion-detection:latest
+  command:
+    - /bin/sh
+    - -c
+    - >
+      while [ ! -d /sys/class/net/upfgtp ]; do sleep 1; done;
+      exec suricata -i upfgtp -k none
+      -l /var/log/suricata
+      -S /etc/suricata/rules/local.rules
+  volumeMounts:
+    - name: suricata-upf-rules
+      mountPath: /etc/suricata/rules/local.rules
+      subPath: local.rules
+      readOnly: true
+    - name: suricata-upf-logs
+      mountPath: /var/log/suricata
